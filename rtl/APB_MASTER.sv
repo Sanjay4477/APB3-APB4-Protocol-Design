@@ -14,10 +14,10 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
    input  logic                   PREADY,
    input  logic                   WRITE_READ,
    input  logic                   transfer,
-   input  logic [ADDR_WIDTH:0]    apb_addr,
+   input  logic [ADDR_WIDTH-1:0]    apb_addr,
    input  logic [DATA_WIDTH-1:0]  apb_wdata,
    input  logic [DATA_WIDTH-1:0]  PRDATA,
-   output logic [ADDR_WIDTH:0]    PADDR,
+   output logic [ADDR_WIDTH-1:0]    PADDR,
    output logic [DATA_WIDTH-1:0]  PWDATA,
    output logic                   PSELx,
    output logic                   PENABLE,
@@ -36,6 +36,8 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
   
   reg error,setup_error,invalid_addr,invalid_wdata,invalid_rdata;
   
+  assign PWRITE=WRITE_READ;
+  
   //Reset checking block with posedge clk
   always_ff @ (posedge PCLK or negedge PRESETn)
     begin
@@ -48,15 +50,15 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
       
     end
   
-  always @(state,transfer,PREADY)
+  always_comb
     
     begin
       
-      PWDATA=0;
-      PADDR=0;
+//       PWDATA=0;
+//       PADDR=0;
       
       if (!PRESETn)
-        next_state=IDLE;
+        next_state<=IDLE;
       
       else
         begin
@@ -66,40 +68,40 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
             IDLE:
               begin
                 
-                PENABLE=0;
+                PENABLE<=0;
                 
                 if (!transfer)
-                  next_state=IDLE;
+                  next_state<=IDLE;
                 else
-                  next_state=SETUP;
+                  next_state<=SETUP;
                 
               end
             
             SETUP:
               begin
                 
-                PENABLE=0;
+                PENABLE<=0;
                 
                 if (WRITE_READ)
                   begin
                     
-                    PADDR=apb_addr;
-                    PWDATA=apb_wdata;
+                    PADDR<=apb_addr;
+                    PWDATA<=apb_wdata;
                     
                   end
                 
                 else
                   begin
                     
-                    PADDR=apb_addr;
+                    PADDR<=apb_addr;
                     
                   end
                 
                 if (transfer && !PSLVERR)
-                  next_state=ACCESS;
+                  next_state<=ACCESS;
                 
                 else
-                  next_state=IDLE;
+                  next_state<=IDLE;
                 
               end
             
@@ -109,7 +111,7 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
                 if (PSELx)
                   begin
                     
-                    PENABLE=1;
+                    PENABLE<=1;
                     
                     if (transfer && !PSLVERR)
                       begin
@@ -120,15 +122,15 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
                             if (WRITE_READ)
                               begin
                                 
-                                next_state=SETUP;
+                                next_state<=SETUP;
                                 
                               end
                             
                             else
                               begin
                                 
-                                next_state=SETUP;
-                                apb_rdata=PRDATA;
+                                next_state<=SETUP;
+                                apb_rdata<=PRDATA;
                                 
                               end
                             
@@ -137,7 +139,7 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
                         else
                           begin
                             
-                            next_state=ACCESS;
+                            next_state<=ACCESS;
                             
                           end
                         
@@ -146,7 +148,7 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
                     else
                       begin
                         
-                        next_state=IDLE;
+                        next_state<=IDLE;
                         
                       end
                     
@@ -154,7 +156,7 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
                 
               end
             
-            default: next_state=IDLE;
+            default: next_state<=IDLE;
             
           endcase
           
@@ -162,10 +164,10 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
       
     end
   
-  assign PSELx=PADDR[ADDR_WIDTH];
+  assign PSELx=state!=IDLE;
   
   
-  always @ (*)
+  always_comb
     begin
       
       if (!PRESETn)
@@ -186,17 +188,17 @@ module master #(parameter ADDR_WIDTH=32,parameter DATA_WIDTH=32)
           else
             setup_error=0;
           
-          if (apb_wdata==={DATA_WIDTH{1'bx}} && WRITE_READ && (state==SETUP || state==ACCESS))
+          if (apb_wdata=={DATA_WIDTH{1'bx}} && WRITE_READ && (state==SETUP || state==ACCESS))
             invalid_wdata=1;
           else
             invalid_wdata=0;
           
-          if (apb_addr==={(ADDR_WIDTH+1){1'bx}} && (state==SETUP || state==ACCESS))
+          if (apb_addr=={(ADDR_WIDTH){1'bx}} && (state==SETUP || state==ACCESS))
             invalid_addr=1;
           else
             invalid_addr=0;
           
-          if (apb_rdata==={DATA_WIDTH{1'bx}} && !WRITE_READ && (state==SETUP || state==ACCESS))
+          if (apb_rdata=={DATA_WIDTH{1'bx}} && !WRITE_READ && (state==SETUP || state==ACCESS))
             invalid_rdata=1;
           else
             invalid_rdata=0;
